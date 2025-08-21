@@ -1,102 +1,93 @@
 Stable Diffusion Prompt Generator
 
-A local web application that uses the Gemini large language model to generate creative, detailed prompts for Stable Diffusion and other AI image models. It runs entirely on your local machine, ensuring your API key and data remain private and secure.
-✨ Features
+A local web application that generates creative and randomized prompts for Stable Diffusion. It combines user-provided keywords with predefined styles and settings to produce unique and detailed prompts.
+Features
 
-    Prompt Generation: Generates highly detailed positive and negative prompts from a few keywords.
+    Intelligent Prompt Generation: This application leverages the powerful Gemini API to take your simple, concise keywords and transform them into rich, descriptive prompts that are ready for use in Stable Diffusion. This feature adds a layer of creativity and detail that would be time-consuming to write manually.
 
-    Secure API Key Management: Prompts for your Gemini API key on the first run and saves it securely to a local file with restricted permissions.
+    Predefined Styles: The app includes a curated list of artistic styles, from Analog Film to Cyberpunk, as a starting point. By selecting a style from the dropdown menu, you can ensure your generated prompts are consistent with a specific aesthetic. This provides a powerful way to guide the AI's output without complex manual adjustments.
 
-    Randomized Settings: Automatically selects a random sampling method and scheduler for each prompt, saving you time.
+    Randomized Settings: To add variety to your image generations, the app automatically selects a random sampling method and scheduler from a pre-defined list. This helps you discover new and interesting combinations that you might not have chosen manually.
 
-    Clipboard Functionality: One-click buttons to copy the generated prompts and settings string for easy use.
+    API Key Management: This is a key security feature. The app securely handles your Gemini API key by storing it in a local, hidden file (key/gemini.key). On the first run, the script will prompt you to enter your key and then save it for future use. This prevents you from hardcoding your key or accidentally uploading it to a public repository.
 
-    User-Friendly Interface: A clean, responsive web interface built with Tailwind CSS.
+    Portable Output: The final output—including the positive prompt, negative prompt, sampling method, and scheduler—is formatted into a single, compact, and importable string. This makes it easy to copy and paste the entire configuration directly into other Stable Diffusion applications like Automatic1111.
 
-⚙️ Prerequisites
+Getting Started
 
-To run this project, you need the following installed on your system:
+To run this application, you will need to have Python 3 installed on your system, along with a Gemini API key.
+Prerequisites
 
-    Python 3.x
+    Python 3
 
-    pip (Python package installer)
+    pip (Python's package installer, usually included with Python 3)
 
-    bash (for the start_server.sh script)
+    curl (A command-line tool for making network requests)
 
-➡️ Getting Started
+    A Gemini API Key
 
-Follow these steps to set up and run the application.
-Step 1: Clone the Repository
+Installation
 
-Clone this repository to your local machine using Git.
+    Clone the repository:
+    Begin by cloning the project from GitHub and navigating into the directory:
 
-git clone https://github.com/lokrez/stable-diffusion-prompt-randomizer.git
-cd stable-diffusion-prompt-randomizer
+    git clone https://github.com/lokrez/stable-diffusion-prompt-randomizer.git
+    cd stable-diffusion-prompt-randomizer
 
+    Install Python dependencies:
+    Run the following command to install the necessary Python libraries:
 
-Step 2: Install Dependencies
+    pip install requests
 
-This project requires the requests Python library. You can install it using the provided requirements.txt file.
+    This command installs the requests library, which the server uses to make HTTP requests to the Gemini API.
 
-pip install -r requirements.txt
+    Run the application:
+    Start the application by running the main bash script:
 
+    ./start_server.sh
 
-Step 3: Run the Application
+On the first run, the script will:
 
-Execute the start_server.sh script from your terminal.
+    Check for all required dependencies.
 
-./start_server.sh
+    Prompt you to enter your Gemini API key, explaining why it is needed.
 
+    Offer to save the key to a local, hidden directory (key/) to make future runs easier and more secure.
 
-Step 4: Provide Your Gemini API Key
+How to Use
 
-The first time you run the script, you will be prompted to enter your Gemini API key.
+The application will automatically open in your default web browser after the server has started.
 
-    💡 Why do I need a key? This application uses the Gemini large language model to generate prompts. Your API key is a unique token that authenticates your requests to Google's servers.
+    Enter Keywords: Use the input fields to provide your creative direction. The "Positive Keywords" field is for what you want to see in the image, while the "Negative Keywords" field is for what you want to exclude.
 
-    ➡️ How do I get a key?
+    Select a Style (Optional): Use the dropdown menu to choose from a variety of predefined artistic styles. If you select a style, your keywords will be intelligently combined with the style's prompts. If you leave this blank, the AI will generate a unique style for you.
 
-        Go to Google AI Studio: https://aistudio.google.com/
+    Generate Prompts: Click the "Generate Prompts" button or press Enter in either of the keyword fields. The application will then display the generated prompts and settings.
 
-        Sign in with your Google account.
+    Copy and Go: Below the generated prompts, you will find dedicated buttons to copy the positive and negative prompts individually, or the entire output as a single, easily pasteable string for use in other applications.
 
-        Click on Get API key in the sidebar.
+Project Structure
 
-        Click Create API key in a new project.
+    start_server.sh: The main bash script that automates the entire startup process, including dependency checks, port management, and API key handling.
 
-The script will save your key to a file in a key/ directory and set the file permissions to 600 for security. The .gitignore file ensures this sensitive information is not accidentally committed to Git.
-🚀 Usage
+    server.py: The core Python web server. It handles client requests, communicates with the Gemini API, and provides a list of predefined styles.
 
-Once the server is running, your default web browser will open to the application page.
+    index.html.template: The HTML file that defines the user interface of the web app. It is a template that gets a port number dynamically inserted by the start_server.sh script.
 
-    Enter positive keywords (e.g., ancient forest, mossy ruins, glowing mushrooms).
+    styles.xml: An XML file containing all the predefined styles and their associated prompts, which the server.py file reads on startup.
 
-    (Optional) Enter negative keywords (e.g., blurry, bad anatomy).
+    key/: A hidden directory created at runtime to securely store your API key. This directory is automatically added to .gitignore.
 
-    Click the ✨ Generate Prompts button.
+    .gitignore: A file that prevents sensitive data like logs and the key/ directory from being committed to the repository.
 
-The application will display the generated positive and negative prompts, along with randomized Stable Diffusion settings. You can then copy these prompts and use them in your preferred AI image generation tool.
-📁 File Structure
+Troubleshooting
 
-    start_server.sh: The main script to start the web server and open the application.
+    "Address already in use" Error: The script is designed to handle this automatically by finding the next available port.
 
-    server.py: The backend Python web server that handles prompt generation using the Gemini API.
+    "API Key Missing" Error: The script will prompt you for your key on the first run. If you are still seeing this error, ensure your key is correctly saved in key/gemini.key or set as a system-wide environment variable.
 
-    index.html.template: The HTML template for the web application's frontend.
+    "Bad Request" Error: This typically indicates a problem with the API key itself. The server will now automatically detect a consistently failing key and prompt you for a new one.
 
-    requirements.txt: Specifies the Python dependencies needed to run the project.
+License
 
-    .gitignore: A configuration file that tells Git which files to ignore. This is crucial for security.
-
-🔒 Security
-
-Your API key is handled with the utmost care. It is stored locally on your machine in a file with restricted access (chmod 600), and the .gitignore file ensures it is never committed to the public repository. The communication between the frontend and the backend occurs locally, so your data never leaves your machine.
-💡 Future Considerations
-
-    Add a user interface for selecting specific sampling methods and schedulers.
-
-    Implement more detailed prompt customization options, such as art styles or lighting conditions, directly in the UI.
-
-    Expand the API to include more features, like fetching a list of all available settings.
-
-    Enhance server-side input validation to increase robustness.
+This project is licensed under the MIT License.
