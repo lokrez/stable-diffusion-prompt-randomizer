@@ -43,6 +43,16 @@
                 class="w-full px-4 py-3 border border-gray-600 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 bg-gray-700 text-gray-100"
                 onkeydown="if(event.key === 'Enter') document.getElementById('generate-btn').click();"
             />
+            
+            <label for="style-select" class="block text-lg font-medium text-gray-300">
+                Select a Style (Optional):
+            </label>
+            <select
+                id="style-select"
+                class="w-full px-4 py-3 border border-gray-600 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 bg-gray-700 text-gray-100"
+            >
+                <option value="">-- Let the AI generate a style --</option>
+            </select>
 
             <button
                 id="generate-btn"
@@ -93,6 +103,7 @@
         const keywordsInput = document.getElementById('keywords-input');
         const negativeKeywordsInput = document.getElementById('negative-keywords-input');
         const generateButton = document.getElementById('generate-btn');
+        const styleSelect = document.getElementById('style-select');
         const resultsSection = document.getElementById('results-section');
         const positivePromptOutput = document.getElementById('positive-prompt-output');
         const negativePromptOutput = document.getElementById('negative-prompt-output');
@@ -127,6 +138,26 @@
             }
         }
 
+        // Fetch the list of styles from the server on page load
+        async function fetchStyles() {
+            try {
+                const response = await fetch('http://localhost:{{SERVER_PORT}}/api/styles');
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+                const styles = await response.json();
+                styles.forEach(style => {
+                    const option = document.createElement('option');
+                    option.value = style;
+                    option.textContent = style;
+                    styleSelect.appendChild(option);
+                });
+            } catch (error) {
+                console.error('Error fetching styles:', error);
+                showMessage('❗ An error occurred while fetching styles. Please check the server status.');
+            }
+        }
+        
         // Add event listeners to the copy buttons
         copyPositiveBtn.addEventListener('click', () => copyToClipboard('positive-prompt-output'));
         copyNegativeBtn.addEventListener('click', () => copyToClipboard('negative-prompt-output'));
@@ -136,9 +167,10 @@
         generateButton.addEventListener('click', async () => {
             const keywords = keywordsInput.value;
             const negativeKeywords = negativeKeywordsInput.value;
+            const selectedStyle = styleSelect.value;
             
-            if (!keywords) {
-                showMessage('⚠️ Please enter at least some positive keywords.');
+            if (!keywords && !selectedStyle) {
+                showMessage('⚠️ Please enter at least some positive keywords or select a style.');
                 return;
             }
 
@@ -156,7 +188,7 @@
                 const response = await fetch('http://localhost:{{SERVER_PORT}}/api/generate', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ keywords, negativeKeywords })
+                    body: JSON.stringify({ keywords, negativeKeywords, style: selectedStyle })
                 });
 
                 if (!response.ok) {
@@ -203,6 +235,9 @@
                 generateButton.innerHTML = `✨ Generate Prompts`;
             }
         });
+        
+        // Call the function to fetch styles when the page loads
+        fetchStyles();
     </script>
 </body>
 </html>

@@ -5,10 +5,12 @@ import sys
 import random
 import requests
 import os
+import xml.etree.ElementTree as ET
 
 # --- Configuration ---
 PORT = int(sys.argv[1]) if len(sys.argv) > 1 else 8000
 MAX_PORT_ATTEMPTS = 10
+STYLES_XML_FILE = "styles.xml"
 
 # === API Configuration ===
 # Read the API key from the environment variable set by the bash script
@@ -30,6 +32,27 @@ SCHEDULERS = [
     'SGM Uniform', 'KL Optimal', 'Align Your Steps', 'Simple',
     'Normal', 'DDIM', 'Beta'
 ]
+
+def load_styles_from_xml(xml_file):
+    """Loads styles from a given XML file."""
+    styles = {}
+    try:
+        tree = ET.parse(xml_file)
+        root = tree.getroot()
+        for preset in root.findall('preset'):
+            name = preset.get('name')
+            if name:
+                styles[name] = {
+                    "prompt": preset.find('prompt').text if preset.find('prompt') is not None else "",
+                    "negative_prompt": preset.find('negative_prompt').text if preset.find('negative_prompt') is not None else ""
+                }
+    except FileNotFoundError:
+        print(f"Warning: Styles XML file not found at {xml_file}. Starting with no custom styles.", file=sys.stderr, flush=True)
+    except ET.ParseError:
+        print(f"Error: Failed to parse XML file at {xml_file}. Please check the file format.", file=sys.stderr, flush=True)
+    return styles
+
+STYLES = load_styles_from_xml(STYLES_XML_FILE)
 
 def increment_failure_count():
     """Reads the failure count file, increments the count, and writes it back."""
@@ -55,6 +78,18 @@ def reset_failure_count():
         print(f"Error removing failure count file: {e}", file=sys.stderr, flush=True)
 
 class PromptGeneratorHandler(http.server.SimpleHTTPRequestHandler):
+    def do_GET(self):
+        # A new endpoint to get the list of styles
+        if self.path == '/api/styles':
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(list(STYLES.keys())).encode('utf-8'))
+            return
+        
+        # For all other GET requests, serve the requested file (like index.html)
+        super().do_GET()
+
     def do_POST(self):
         # Handle API requests from the web app
         if self.path == '/api/generate':
@@ -72,13 +107,29 @@ class PromptGeneratorHandler(http.server.SimpleHTTPRequestHandler):
             
             keywords = data.get('keywords', '')
             negative_keywords = data.get('negativeKeywords', '')
+            selected_style = data.get('style', '')
 
-            # Randomly select a sampling method and scheduler
-            sampling_method = random.choice(SAMPLING_METHODS)
-            scheduler = random.choice(SCHEDULERS)
-            
-            # Construct the prompt for the Gemini API
-            prompt_text = f"""
+            # Check if a style is selected
+            if selected_style and selected_style in STYLES:
+                style_prompts = STYLES[selected_style]
+                
+                # Construct a new prompt for Gemini to add "flavor words"
+                prompt_text = f"""
+                You are an expert prompt writer for Stable Diffusion. Take the following user input and combine it with the provided style to create a single, cohesive, and creative prompt. Add descriptive "flavor words" to make the prompt more detailed and artistic while staying true to the style.
+                
+                User Keywords: "{keywords}"
+                Base Positive Prompt: "{style_prompts['prompt']}"
+                Base Negative Prompt: "{style_prompts['negative_prompt']}"
+
+                Your final output should be a single, detailed positive prompt and a single, detailed negative prompt.
+                Return only the generated positive prompt and negative prompt, separated by the string "---NEGATIVE---".
+                """
+                
+                payload = {"contents": [{"role": "user", "parts": [{"text": prompt_text}]}]}
+                
+            else:
+                # Fallback to model-generated prompts if no style is selected
+                prompt_text = f"""
 Create a highly detailed, creative, and artistic stable diffusion prompt based on the following keywords: "{keywords}".
 The prompt should be structured to include a main subject, a descriptive background, a specific art style, lighting conditions, and a mood or atmosphere.
 Make sure to use rich, descriptive adjectives and verbs.
@@ -88,43 +139,22 @@ Example structure:
 "A [main subject] in a [descriptive background], [specific art style], [lighting], [mood], cinematic, highly detailed, 4k, digital art. Negative prompt: [negative keywords]."
 
 Return only the generated positive prompt and negative prompt, separated by the string "---NEGATIVE---".
-            """
-            
-            payload = {
-                "contents": [{"role": "user", "parts": [{"text": prompt_text}]}]
-            }
+                """
+                payload = {"contents": [{"role": "user", "parts": [{"text": prompt_text}]}]}
 
             try:
                 # Make the API call to Gemini
                 response = requests.post(f"{API_URL}{API_KEY}", json=payload)
-                response.raise_for_status() # Raise an exception for bad status codes
-                
-                # If the request is successful, reset the failure count
+                response.raise_for_status()
                 reset_failure_count()
-
                 result = response.json()
                 generated_text = result['candidates'][0]['content']['parts'][0]['text']
                 
                 # Split the generated text into positive and negative parts
                 parts = generated_text.split("---NEGATIVE---")
-                positive_prompt = parts[0].strip()
-                negative_prompt = parts[1].strip() if len(parts) > 1 else ""
-
-                # Build the final response JSON
-                response_data = {
-                    "positive_prompt": positive_prompt,
-                    "negative_prompt": negative_prompt,
-                    "sampling_method": sampling_method,
-                    "scheduler": scheduler
-                }
-
-                self.send_response(200)
-                self.send_header('Content-type', 'application/json')
-                self.end_headers()
-                self.wfile.write(json.dumps(response_data).encode('utf-8'))
-            
+                positive_prompt_base = parts[0].strip()
+                negative_prompt_base = parts[1].strip() if len(parts) > 1 else ""
             except requests.exceptions.RequestException as e:
-                # If the API request fails with a 400 Client Error, it's likely a bad key
                 if e.response and e.response.status_code == 400:
                     failures = increment_failure_count()
                     if failures >= MAX_FAILURES:
@@ -140,22 +170,41 @@ Return only the generated positive prompt and negative prompt, separated by the 
                         error_data = {"error": f"API request failed: {e}. Failure count: {failures}/{MAX_FAILURES}", "code": "API_REQUEST_FAILED"}
                         self.wfile.write(json.dumps(error_data).encode('utf-8'))
                 else:
-                    # For all other request exceptions, return a generic error
                     self.send_response(500)
                     self.send_header('Content-type', 'application/json')
                     self.end_headers()
                     error_data = {"error": f"API request failed: {e}", "code": "API_REQUEST_FAILED"}
                     self.wfile.write(json.dumps(error_data).encode('utf-8'))
+                return
             except (KeyError, IndexError) as e:
                 self.send_response(500)
                 self.send_header('Content-type', 'application/json')
                 self.end_headers()
                 error_data = {"error": f"Failed to parse API response: {e}", "code": "API_RESPONSE_PARSE_ERROR"}
                 self.wfile.write(json.dumps(error_data).encode('utf-8'))
+                return
+            
+            # Randomly select a sampling method and scheduler
+            sampling_method = random.choice(SAMPLING_METHODS)
+            scheduler = random.choice(SCHEDULERS)
+            
+            # Build the final response JSON
+            response_data = {
+                "positive_prompt": positive_prompt_base,
+                "negative_prompt": negative_prompt_base,
+                "sampling_method": sampling_method,
+                "scheduler": scheduler
+            }
+
+            self.send_response(200)
+            self.send_header('Content-type', 'application/json')
+            self.end_headers()
+            self.wfile.write(json.dumps(response_data).encode('utf-8'))
             return
         
         # For all other GET requests, serve the requested file (like index.html)
         super().do_GET()
+
 
 # Server startup logic with port fallback
 for i in range(MAX_PORT_ATTEMPTS):
