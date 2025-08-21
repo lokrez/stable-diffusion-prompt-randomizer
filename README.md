@@ -9,7 +9,7 @@ Features
 
     Randomized Settings: To add variety to your image generations, the app automatically selects a random sampling method and scheduler from a pre-defined list. This helps you discover new and interesting combinations that you might not have chosen manually.
 
-    API Key Management: This is a key security feature. The app securely handles your Gemini API key by storing it in a local, hidden file (key/gemini.key). On the first run, the script will prompt you to enter your key and then save it for future use. This prevents you from hardcoding your key or accidentally uploading it to a public repository.
+    API Key Management: This is a key security feature. The app securely handles your Gemini API key by storing it in a local, hidden file (key/gemini.key). On the first run, the script will prompt you to enter your key and then save it for future use. This prevents you from hardcoding your key or accidentally uploading it to a public repository. The server also keeps a count of consecutive API failures and will prompt you to replace the key after three failed attempts, making the app more reliable.
 
     Portable Output: The final output—including the positive prompt, negative prompt, sampling method, and scheduler—is formatted into a single, compact, and importable string. This makes it easy to copy and paste the entire configuration directly into other Stable Diffusion applications like Automatic1111.
 
@@ -34,10 +34,12 @@ Installation
     git clone https://github.com/lokrez/stable-diffusion-prompt-randomizer.git
     cd stable-diffusion-prompt-randomizer
 
+
     Install Python dependencies:
     Run the following command to install the necessary Python libraries:
 
     pip install requests
+
 
     This command installs the requests library, which the server uses to make HTTP requests to the Gemini API.
 
@@ -45,6 +47,7 @@ Installation
     Start the application by running the main bash script:
 
     ./start_server.sh
+
 
 On the first run, the script will:
 
