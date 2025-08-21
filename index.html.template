@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Stable Diffusion Prompt Generator</title>
+    <!-- Use Tailwind CSS for styling -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center min-h-screen bg-gray-900 text-gray-100 p-4">
+    <div class="w-full max-w-2xl bg-gray-800 rounded-2xl shadow-xl p-8 space-y-6 transform transition-all duration-300">
+        <div class="text-center">
+            <h1 class="text-4xl font-extrabold text-blue-400 mb-2">Stable Diffusion Prompt Generator</h1>
+            <p class="text-gray-400">
+                💡 Enter a few keywords and get a creative, detailed prompt to use in your favorite AI image model.
+            </p>
+        </div>
+
+        <div class="space-y-4">
+            <label for="keywords-input" class="block text-lg font-medium text-gray-300">
+                Positive Keywords:
+            </label>
+            <input
+                id="keywords-input"
+                type="text"
+                placeholder="e.g., cyberpunk city, samurai, neon lights"
+                class="w-full px-4 py-3 border border-gray-600 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 bg-gray-700 text-gray-100"
+                onkeydown="if(event.key === 'Enter') document.getElementById('generate-btn').click();"
+            />
+
+            <label for="negative-keywords-input" class="block text-lg font-medium text-gray-300">
+                Negative Keywords:
+            </label>
+            <input
+                id="negative-keywords-input"
+                type="text"
+                placeholder="e.g., blurry, duplicate, bad anatomy"
+                class="w-full px-4 py-3 border border-gray-600 rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors duration-200 bg-gray-700 text-gray-100"
+                onkeydown="if(event.key === 'Enter') document.getElementById('generate-btn').click();"
+            />
+
+            <button
+                id="generate-btn"
+                class="w-full flex items-center justify-center py-3 px-6 border border-transparent rounded-xl shadow-sm text-lg font-semibold text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all duration-200 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+                ✨ Generate Prompts
+            </button>
+        </div>
+
+        <div id="results-section" class="space-y-4 hidden">
+            <h2 class="text-xl font-bold text-gray-300">Generated Prompts:</h2>
+            <div class="bg-gray-700 rounded-xl p-4 space-y-4">
+                <label class="block text-md font-medium text-gray-300">Positive Prompt:</label>
+                <textarea id="positive-prompt-output" readonly class="w-full h-24 p-2 border border-gray-600 rounded-xl shadow-sm bg-gray-600 text-gray-200 resize-none font-mono text-sm"></textarea>
+                <button id="copy-positive-btn" class="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-xl shadow-sm text-base font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
+                    Copy Positive Prompt
+                </button>
+                <label class="block text-md font-medium text-gray-300">Negative Prompt:</label>
+                <textarea id="negative-prompt-output" readonly class="w-full h-24 p-2 border border-gray-600 rounded-xl shadow-sm bg-gray-600 text-gray-200 resize-none font-mono text-sm"></textarea>
+                <button id="copy-negative-btn" class="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-xl shadow-sm text-base font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
+                    Copy Negative Prompt
+                </button>
+            </div>
+            
+            <h2 class="text-xl font-bold text-gray-300">Randomized Settings:</h2>
+            <div class="bg-gray-700 rounded-xl p-4 space-y-2">
+                <p class="font-mono text-sm text-gray-200">
+                    <span class="font-bold">Sampling Method:</span> <span id="sampling-method-output"></span>
+                </p>
+                <p class="font-mono text-sm text-gray-200">
+                    <span class="font-bold">Scheduler:</span> <span id="scheduler-output"></span>
+                </p>
+            </div>
+            
+            <h2 class="text-xl font-bold text-gray-300">Importable String:</h2>
+            <textarea id="importable-string-output" readonly class="w-full h-24 p-2 border border-gray-600 rounded-xl shadow-sm bg-gray-600 text-gray-200 resize-none font-mono text-sm"></textarea>
+            <button id="copy-importable-btn" class="w-full flex items-center justify-center py-2 px-4 border border-transparent rounded-xl shadow-sm text-base font-medium text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors duration-200">
+                Copy Importable String
+            </button>
+        </div>
+
+        <div id="message-display" class="mt-4 p-3 rounded-lg text-center text-blue-200 bg-blue-900 hidden">
+        </div>
+    </div>
+    
+    <script>
+        // Get all the DOM elements
+        const keywordsInput = document.getElementById('keywords-input');
+        const negativeKeywordsInput = document.getElementById('negative-keywords-input');
+        const generateButton = document.getElementById('generate-btn');
+        const resultsSection = document.getElementById('results-section');
+        const positivePromptOutput = document.getElementById('positive-prompt-output');
+        const negativePromptOutput = document.getElementById('negative-prompt-output');
+        const samplingMethodOutput = document.getElementById('sampling-method-output');
+        const schedulerOutput = document.getElementById('scheduler-output');
+        const importableStringOutput = document.getElementById('importable-string-output');
+        const copyPositiveBtn = document.getElementById('copy-positive-btn');
+        const copyNegativeBtn = document.getElementById('copy-negative-btn');
+        const copyImportableBtn = document.getElementById('copy-importable-btn');
+        const messageDisplay = document.getElementById('message-display');
+
+        // Helper function to show a temporary message
+        function showMessage(msg) {
+            messageDisplay.innerText = msg;
+            messageDisplay.classList.remove('hidden');
+        }
+
+        // Helper function to handle clipboard copying
+        function copyToClipboard(elementId) {
+            const textToCopy = document.getElementById(elementId).value;
+            try {
+                const textarea = document.createElement('textarea');
+                textarea.value = textToCopy;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showMessage('✅ Copied to clipboard!');
+            } catch (err) {
+                showMessage('❌ Failed to copy. Please select and copy manually.');
+                console.error('Copy to clipboard failed:', err);
+            }
+        }
+
+        // Add event listeners to the copy buttons
+        copyPositiveBtn.addEventListener('click', () => copyToClipboard('positive-prompt-output'));
+        copyNegativeBtn.addEventListener('click', () => copyToClipboard('negative-prompt-output'));
+        copyImportableBtn.addEventListener('click', () => copyToClipboard('importable-string-output'));
+        
+        // Add event listener for the generate button
+        generateButton.addEventListener('click', async () => {
+            const keywords = keywordsInput.value;
+            const negativeKeywords = negativeKeywordsInput.value;
+            
+            if (!keywords) {
+                showMessage('⚠️ Please enter at least some positive keywords.');
+                return;
+            }
+
+            // Show a loading state
+            generateButton.disabled = true;
+            generateButton.innerHTML = `<svg class="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg> Generating...`;
+            messageDisplay.classList.add('hidden');
+            resultsSection.classList.add('hidden');
+
+            try {
+                // Send the keywords to the local Python server
+                const response = await fetch('http://localhost:{{SERVER_PORT}}/api/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ keywords, negativeKeywords })
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    let errorMessage = '❗ An unknown error occurred.';
+                    if (errorData.code) {
+                        switch(errorData.code) {
+                            case 'API_KEY_MISSING':
+                                errorMessage = '❌ API Key Missing. Please check your start_server.sh file.';
+                                break;
+                            case 'API_REQUEST_FAILED':
+                                errorMessage = `❌ API Request Failed: ${errorData.error}. Check your network and API key.`;
+                                break;
+                            case 'API_RESPONSE_PARSE_ERROR':
+                                errorMessage = `❌ Failed to parse API response: ${errorData.error}.`;
+                                break;
+                            case 'API_KEY_FAILED_TOO_MANY_TIMES':
+                                errorMessage = `❌ Invalid API Key. Please restart the script and enter a new key.`;
+                                break;
+                            default:
+                                errorMessage = `❗ Server error: ${errorData.error || 'Unknown error'}`;
+                                break;
+                        }
+                    }
+                    throw new Error(errorMessage);
+                }
+
+                const data = await response.json();
+                
+                // Populate the UI with the response from the server
+                positivePromptOutput.value = data.positive_prompt;
+                negativePromptOutput.value = data.negative_prompt;
+                samplingMethodOutput.textContent = data.sampling_method;
+                schedulerOutput.textContent = data.scheduler;
+                importableStringOutput.value = `${data.positive_prompt} :: ${data.negative_prompt} :: ${data.sampling_method} :: ${data.scheduler}`;
+
+                resultsSection.classList.remove('hidden');
+            } catch (error) {
+                console.error('Error fetching prompts:', error);
+                showMessage(error.message);
+            } finally {
+                // Reset the button state
+                generateButton.disabled = false;
+                generateButton.innerHTML = `✨ Generate Prompts`;
+            }
+        });
+    </script>
+</body>
+</html>
+

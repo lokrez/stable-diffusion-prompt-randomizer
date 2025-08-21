@@ -1,0 +1,31 @@
+# Log files
+*.log
+server.log
+startup.log
+
+# Dynamically created HTML file
+index.html
+
+# API key files and directories
+key/
+/prompt_randomizer/key/
+*.key
+.env
+.DS_Store # macOS
+Thumbs.db # Windows
+
+# Python-specific files
+__pycache__/
+*.pyc
+
+# IDE-specific files
+.vscode/
+.idea/
+# Log files
+*.log
+
+# Dynamically created HTML file
+index.html
+
+# API key directory
+key/
