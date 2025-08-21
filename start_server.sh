@@ -120,25 +120,28 @@ get_api_key
 
 # Start the server and capture its output
 echo "Starting the Python server..."
-server_output=$(python3 -u "$SERVER_FILE" "$PORT" 2>&1)
-SERVER_PID=$(echo "$server_output" | grep -oP '(?<=Server process ID: )\d+')
+GEMINI_API_KEY="$GEMINI_API_KEY" python3 -u "$SERVER_FILE" "$PORT" > server.log 2>&1 &
+SERVER_PID=$!
+echo "Server process ID: $SERVER_PID"
 
-if [ -z "$SERVER_PID" ]; then
-    echo "❌ Failed to start the server. Check your Python and library installations."
-    echo "Server output:"
-    echo "$server_output"
-    exit 1
-fi
+# Wait for the server to confirm it is listening and get the final port number
+ACTUAL_PORT=""
+echo "Waiting for server to start..."
+MAX_WAIT_TIME=10
+start_time=$(date +%s)
+while [ -z "$ACTUAL_PORT" ]; do
+    current_time=$(date +%s)
+    if (( current_time - start_time > MAX_WAIT_TIME )); then
+        echo "❌ Server failed to start in under $MAX_WAIT_TIME seconds. Exiting."
+        kill $SERVER_PID
+        exit 1
+    fi
+    ACTUAL_PORT=$(grep -oP '(?<=Serving at port )\d+' server.log)
+    sleep 1
+done
 
-ACTUAL_PORT=$(echo "$server_output" | grep -oP '(?<=Serving at port )\d+')
-
-if [ -z "$ACTUAL_PORT" ]; then
-    echo "❌ Failed to determine the server port. Check the server.py file for startup message."
-    kill "$SERVER_PID"
-    exit 1
-fi
-
-echo "$server_output"
+echo "Server is running on port $ACTUAL_PORT."
+echo "Access the app at http://localhost:$ACTUAL_PORT"
 
 # Check the server logs for the specific error code indicating too many failures.
 if grep -q "API_KEY_FAILED_TOO_MANY_TIMES" server.log; then
@@ -150,9 +153,6 @@ if grep -q "API_KEY_FAILED_TOO_MANY_TIMES" server.log; then
     kill $SERVER_PID
     exit 1
 fi
-
-echo "Server is running on port $ACTUAL_PORT."
-echo "Access the app at http://localhost:$ACTUAL_PORT"
 
 # Add a 2-second delay to ensure the server is fully ready before the browser attempts to connect.
 echo "Waiting for the server to be fully ready..."

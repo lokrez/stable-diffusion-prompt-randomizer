@@ -109,39 +109,34 @@ class PromptGeneratorHandler(http.server.SimpleHTTPRequestHandler):
             negative_keywords = data.get('negativeKeywords', '')
             selected_style = data.get('style', '')
 
-            # Check if a style is selected
+            # Initialize prompts
+            positive_prompt_base = keywords
+            negative_prompt_base = negative_keywords
+            
+            # If a style is selected, combine it with user keywords
             if selected_style and selected_style in STYLES:
                 style_prompts = STYLES[selected_style]
-                
-                # Construct a new prompt for Gemini to add "flavor words"
-                prompt_text = f"""
-                You are an expert prompt writer for Stable Diffusion. Take the following user input and combine it with the provided style to create a single, cohesive, and creative prompt. Add descriptive "flavor words" to make the prompt more detailed and artistic while staying true to the style.
-                
-                User Keywords: "{keywords}"
-                Base Positive Prompt: "{style_prompts['prompt']}"
-                Base Negative Prompt: "{style_prompts['negative_prompt']}"
+                positive_prompt_base = style_prompts['prompt'].replace("{prompt}", keywords) if "{prompt}" in style_prompts['prompt'] else style_prompts['prompt'] + ", " + keywords
+                negative_prompt_base = style_prompts['negative_prompt'] + ", " + negative_keywords
 
-                Your final output should be a single, detailed positive prompt and a single, detailed negative prompt.
-                Return only the generated positive prompt and negative prompt, separated by the string "---NEGATIVE---".
-                """
-                
-                payload = {"contents": [{"role": "user", "parts": [{"text": prompt_text}]}]}
-                
-            else:
-                # Fallback to model-generated prompts if no style is selected
-                prompt_text = f"""
-Create a highly detailed, creative, and artistic stable diffusion prompt based on the following keywords: "{keywords}".
-The prompt should be structured to include a main subject, a descriptive background, a specific art style, lighting conditions, and a mood or atmosphere.
-Make sure to use rich, descriptive adjectives and verbs.
-After the main prompt, also generate a list of negative prompt keywords based on the following negative keywords: "{negative_keywords}". These should be common things to avoid in generated images, such as blurriness, artifacts, or bad anatomy.
+            # Prepare prompt for Gemini
+            prompt_text = f"""
+            You are an expert prompt writer for Stable Diffusion.
+            
+            Based on the following user input, generate a positive and negative prompt.
+            
+            User Keywords: "{keywords}"
+            Base Positive Prompt: "{positive_prompt_base}"
+            Base Negative Prompt: "{negative_prompt_base}"
+            
+            If the Base Negative Prompt is empty, you MUST create a new, high-quality negative prompt with a random number of words between 5 and 20. The negative prompt should be based on common things to avoid in generated images.
+            
+            Your final output should be a single, detailed positive prompt and a single, detailed negative prompt.
+            Return only the generated positive prompt and negative prompt, separated by the string "---NEGATIVE---".
+            """
 
-Example structure:
-"A [main subject] in a [descriptive background], [specific art style], [lighting], [mood], cinematic, highly detailed, 4k, digital art. Negative prompt: [negative keywords]."
-
-Return only the generated positive prompt and negative prompt, separated by the string "---NEGATIVE---".
-                """
-                payload = {"contents": [{"role": "user", "parts": [{"text": prompt_text}]}]}
-
+            payload = {"contents": [{"role": "user", "parts": [{"text": prompt_text}]}]}
+            
             try:
                 # Make the API call to Gemini
                 response = requests.post(f"{API_URL}{API_KEY}", json=payload)
@@ -152,8 +147,8 @@ Return only the generated positive prompt and negative prompt, separated by the 
                 
                 # Split the generated text into positive and negative parts
                 parts = generated_text.split("---NEGATIVE---")
-                positive_prompt_base = parts[0].strip()
-                negative_prompt_base = parts[1].strip() if len(parts) > 1 else ""
+                final_positive_prompt = parts[0].strip()
+                final_negative_prompt = parts[1].strip() if len(parts) > 1 else ""
             except requests.exceptions.RequestException as e:
                 if e.response and e.response.status_code == 400:
                     failures = increment_failure_count()
@@ -190,8 +185,8 @@ Return only the generated positive prompt and negative prompt, separated by the 
             
             # Build the final response JSON
             response_data = {
-                "positive_prompt": positive_prompt_base,
-                "negative_prompt": negative_prompt_base,
+                "positive_prompt": final_positive_prompt,
+                "negative_prompt": final_negative_prompt,
                 "sampling_method": sampling_method,
                 "scheduler": scheduler
             }
